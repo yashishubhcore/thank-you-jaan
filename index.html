@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Thank You, Yashi ❤️</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    body, html {
+      width: 100%;
+      height: 100%;
+      background-color: #030106;
+      color: #ffffff;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      overflow: hidden;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    /* 9:16 Responsive Video Container */
+    #stage {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      max-width: 56.25vh; /* 9:16 aspect ratio constraint */
+      max-height: 177.78vw;
+      background: radial-gradient(circle at center, #11051c 0%, #04010a 70%, #000000 100%);
+      box-shadow: 0 0 50px rgba(255, 105, 180, 0.15);
+      overflow: hidden;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+      pointer-events: none;
+    }
+
+    /* Typography & Subtitles Overlay */
+    #text-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      padding: 2.5rem 1.5rem;
+      text-align: center;
+      pointer-events: none;
+    }
+
+    .msg-line {
+      opacity: 0;
+      transform: translateY(20px) scale(0.96);
+      transition: opacity 1.2s cubic-bezier(0.16, 1, 0.3, 1), transform 1.2s cubic-bezier(0.16, 1, 0.3, 1);
+      font-size: 1.35rem;
+      font-weight: 400;
+      line-height: 1.6;
+      color: #fff0f5;
+      text-shadow: 0 0 12px rgba(255, 105, 180, 0.6), 0 0 24px rgba(255, 20, 147, 0.3);
+      margin: 8px 0;
+      width: 100%;
+      letter-spacing: 0.3px;
+    }
+
+    .msg-line.highlight {
+      font-size: 1.65rem;
+      font-weight: 600;
+      color: #ffb6c1;
+      text-shadow: 0 0 16px rgba(255, 105, 180, 0.9), 0 0 32px rgba(255, 20, 147, 0.5);
+    }
+
+    .msg-line.visible {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+
+    .msg-line.exit {
+      opacity: 0;
+      transform: translateY(-15px) scale(1.02);
+      transition: opacity 0.8s ease, transform 0.8s ease;
+    }
+
+    /* Interactive Overlay UI */
+    .ui-layer {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 30;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      background: rgba(4, 1, 10, 0.85);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      transition: opacity 0.8s ease;
+    }
+
+    .replay-btn {
+      background: linear-gradient(135deg, #ff1493, #ff69b4);
+      color: #ffffff;
+      border: none;
+      padding: 16px 36px;
+      font-size: 1.2rem;
+      font-weight: 600;
+      border-radius: 50px;
+      cursor: pointer;
+      box-shadow: 0 0 25px rgba(255, 20, 147, 0.6), 0 0 50px rgba(255, 105, 180, 0.3);
+      outline: none;
+      transform: scale(1);
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+      pointer-events: auto;
+    }
+
+    .replay-btn:active {
+      transform: scale(0.95);
+    }
+
+    .hidden {
+      opacity: 0 !important;
+      pointer-events: none !important;
+    }
+
+    /* Ambient Glow Overlay */
+    #glow-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 2;
+      pointer-events: none;
+      background: radial-gradient(circle at 50% 50%, rgba(255, 20, 147, 0.15), transparent 70%);
+      transition: opacity 1.5s ease;
+    }
+  </style>
+</head>
+<body>
+
+<div id="stage">
+  <canvas id="canvas"></canvas>
+  <div id="glow-overlay"></div>
+  <div id="text-overlay"></div>
+
+  <!-- Replay Screen -->
+  <div id="replay-screen" class="ui-layer hidden">
+    <button id="replay-btn" class="replay-btn">Replay ❤️</button>
+  </div>
+</div>
+
+<script>
+  // Canvas & Canvas Context Setup
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+  const stage = document.getElementById('stage');
+  const textOverlay = document.getElementById('text-overlay');
+  const replayScreen = document.getElementById('replay-screen');
+  const glowOverlay = document.getElementById('glow-overlay');
+  const replayBtn = document.getElementById('replay-btn');
+
+  let width, height;
+  function resize() {
+    width = canvas.width = stage.clientWidth;
+    height = canvas.height = stage.clientHeight;
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  // Particle Systems
+  let stars = [];
+  let petals = [];
+  let heartParticles = [];
+  let currentVisualMode = 'STARS'; // STARS, HEARTS, HEART_FORM, WARM_BURST
+  let animationFrameId = null;
+
+  class Star {
+    constructor() {
+      this.reset();
+    }
+    reset() {
+      this.x = Math.random() * width;
+      this.y = Math.random() * height;
+      this.size = Math.random() * 1.8 + 0.5;
+      this.alpha = Math.random() * 0.8 + 0.2;
+      this.speed = Math.random() * 0.01 + 0.005;
+      this.dir = Math.random() > 0.5 ? 1 : -1;
+    }
+    update() {
+      this.alpha += this.speed * this.dir;
+      if (this.alpha >= 1 || this.alpha <= 0.1) {
+        this.dir *= -1;
+      }
+    }
+    draw() {
+      ctx.save();
+      ctx.globalAlpha = this.alpha;
+      ctx.fillStyle = "#ffffff";
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+  }
+
+  class Petal {
+    constructor() {
+      this.reset();
+    }
+    reset() {
+      this.x = Math.random() * width;
+      this.y = -20;
+      this.size = Math.random() * 6 + 4;
+      this.speedY = Math.random() * 0.8 + 0.5;
+      this.speedX = Math.random() * 0.6 - 0.3;
+      this.rotation = Math.random() * Math.PI * 2;
+      this.rotSpeed = (Math.random() - 0.5) * 0.02;
+      this.alpha = Math.random() * 0.6 + 0.3;
+    }
+    update() {
+      this.y += this.speedY;
+      this.x += Math.sin(this.y * 0.01) + this.speedX;
+      this.rotation += this.rotSpeed;
+      if (this.y > height + 20) {
+        this.reset();
+      }
+    }
+    draw() {
+      ctx.save();
+      ctx.translate(this.x, this.y);
+      ctx.rotate(this.rotation);
+      ctx.globalAlpha = this.alpha;
+      ctx.fillStyle = '#ffb6c1';
+      ctx.beginPath();
+      ctx.ellipse(0, 0, this.size, this.size / 2, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+  }
+
+  class HeartParticle {
+    constructor(targetX, targetY) {
+      this.x = Math.random() * width;
+      this.y = Math.random() * height;
+      this.targetX = targetX;
+      this.targetY = targetY;
+      this.size = Math.random() * 2 + 1;
+      this.alpha = Math.random() * 0.8 + 0.2;
+      this.color = Math.random() > 0.3 ? '#ff1493' : '#ff69b4';
+      this.speed = Math.random() * 0.03 + 0.015;
+    }
+    update() {
+      this.x += (this.targetX - this.x) * this.speed;
+      this.y += (this.targetY - this.y) * this.speed;
+    }
+    draw() {
+      ctx.save();
+      ctx.globalAlpha = this.alpha;
+      ctx.fillStyle = this.color;
+      ctx.shadowBlur = 8;
+      ctx.shadowColor = this.color;
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+  }
+
+  function initParticles() {
+    stars = Array.from({ length: 80 }, () => new Star());
+    petals = Array.from({ length: 25 }, () => new Petal());
+
+    // Compute Heart Points
+    heartParticles = [];
+    const scale = Math.min(width, height) * 0.013;
+    const numPoints = 120;
+    for (let i = 0; i < numPoints; i++) {
+      const t = (i / numPoints) * Math.PI * 2;
+      const x = 16 * Math.pow(Math.sin(t), 3);
+      const y = -(13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t));
+      const targetX = width / 2 + x * scale;
+      const targetY = height / 2.3 + y * scale;
+      heartParticles.push(new HeartParticle(targetX, targetY));
+    }
+  }
+
+  let heartPulseTime = 0;
+  function render() {
+    ctx.clearRect(0, 0, width, height);
+
+    // Stars background
+    stars.forEach(s => {
+      s.update();
+      s.draw();
+    });
+
+    // Petals
+    petals.forEach(p => {
+      p.update();
+      p.draw();
+    });
+
+    // Heart formation mode
+    if (currentVisualMode === 'HEART_FORM' || currentVisualMode === 'WARM_BURST') {
+      heartPulseTime += 0.03;
+      const pulse = 1 + Math.sin(heartPulseTime) * 0.05;
+      
+      ctx.save();
+      ctx.translate(width / 2, height / 2.3);
+      ctx.scale(pulse, pulse);
+      ctx.translate(-width / 2, -height / 2.3);
+      heartParticles.forEach(hp => {
+        hp.update();
+        hp.draw();
+      });
+      ctx.restore();
+    }
+
+    animationFrameId = requestAnimationFrame(render);
+  }
+
+  // Web Audio API Ambient Sound Generator
+  let audioCtx = null;
+
+  function initAudio() {
+    if (audioCtx) return;
+    try {
+      const AudioContext = window.AudioContext || window.webkitAudioContext;
+      audioCtx = new AudioContext();
+
+      // Master Volume
+      const masterGain = audioCtx.createGain();
+      masterGain.gain.setValueAtTime(0.12, audioCtx.currentTime);
+      masterGain.connect(audioCtx.destination);
+
+      // Ambient Drone Pentatonic Scale (C3, G3, A3, C4, E4)
+      const freqs = [130.81, 196.00, 220.00, 261.63, 329.63];
+      
+      freqs.forEach((freq, idx) => {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+
+        // Low LFO for gentle atmospheric volume breathing
+        const lfo = audioCtx.createOscillator();
+        const lfoGain = audioCtx.createGain();
+        lfo.frequency.setValueAtTime(0.1 + idx * 0.03, audioCtx.currentTime);
+        lfoGain.gain.setValueAtTime(0.03, audioCtx.currentTime);
+        
+        lfo.connect(lfoGain);
+        lfoGain.connect(gain.gain);
+        
+        gain.gain.setValueAtTime(0.04, audioCtx.currentTime);
+        osc.connect(gain);
+        gain.connect(masterGain);
+        
+        osc.start();
+        lfo.start();
+      });
+
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+    } catch (e) {
+      console.log("Audio autoplay constrained by browser policy.");
+    }
+  }
+
+  // Story Timeline Orchestration Engine
+  const script = [
+    // Scene 1
+    {
+      mode: 'STARS',
+      bgGlow: 0.1,
+      lines: [
+        { text: 'Jaan... ❤️', highlight: true, delay: 0 },
+        { text: 'Aaj main tumhe sirf ek baat kehna chahta hoon...', delay: 2500 }
+      ],
+      duration: 6000
+    },
+    // Scene 2
+    {
+      mode: 'HEARTS',
+      bgGlow: 0.25,
+      lines: [
+        { text: 'Thank You... ❤️', highlight: true, delay: 0 },
+        { text: 'Meri zindagi mein aane ke liye.', delay: 2200 }
+      ],
+      duration: 5500
+    },
+    // Scene 3 - Gratitude List Part 1
+    {
+      mode: 'HEARTS',
+      bgGlow: 0.2,
+      lines: [
+        { text: 'Thank you meri care karne ke liye. 🫶', delay: 0 },
+        { text: 'Thank you mera saath nibhane ke liye. ❤️', delay: 2500 }
+      ],
+      duration: 5500
+    },
+    // Scene 3 - Part 2
+    {
+      mode: 'HEARTS',
+      bgGlow: 0.2,
+      lines: [
+        { text: 'Thank you meri life ko samajhne ke liye.', delay: 0 },
+        { text: 'Thank you mujhe poora karne ke liye. ✨', delay: 2500 }
+      ],
+      duration: 5500
+    },
+    // Scene 3 - Part 3
+    {
+      mode: 'HEARTS',
+      bgGlow: 0.25,
+      lines: [
+        { text: 'Thank you meri zindagi sawarne ke liye.', delay: 0 },
+        { text: 'Thank you meri zindagi mein itni khushiyan lane ke liye. 🌸', delay: 2500 }
+      ],
+      duration: 5800
+    },
+    // Scene 3 - Part 4
+    {
+      mode: 'HEARTS',
+      bgGlow: 0.2,
+      lines: [
+        { text: 'Thank you mujhe apna banane ke liye.', delay: 0 },
+        { text: 'Thank you itna pyaar karne ke liye. ❤️', highlight: true, delay: 2400 }
+      ],
+      duration: 5500
+    },
+    // Scene 4 - Support
+    {
+      mode: 'HEARTS',
+      bgGlow: 0.15,
+      lines: [
+        { text: 'Thank you mere har tension ko kam karne mein meri help karne ke liye.', delay: 0 },
+        { text: 'Thank you meri problems ko samajhne ke liye.', delay: 2800 },
+        { text: 'Thank you mujhe kabhi judge na karne ke liye.', delay: 5200 }
+      ],
+      duration: 8200
+    },
+    // Scene 5 - Acceptance & Heart Form
+    {
+      mode: 'HEART_FORM',
+      bgGlow: 0.35,
+      lines: [
+        { text: 'Main jaisa bhi hoon...', delay: 0 },
+        { text: 'Tumne mujhe jaana...', delay: 2000 },
+        { text: 'Samjha...', delay: 3500 },
+        { text: 'Aur phir bhi mujhe accept kiya. ❤️', highlight: true, delay: 4800 },
+        { text: 'Thank you... mujhe accept karne ke liye.', delay: 7500 }
+      ],
+      duration: 10500
+    },
+    // Scene 6 - Emotional Depth
+    {
+      mode: 'HEART_FORM',
+      bgGlow: 0.3,
+      lines: [
+        { text: 'Thank you meri har baat ko samajhne ki koshish karne ke liye.', delay: 0 },
+        { text: 'Thank you apni udaasi chhupa kar meri khushi ki wajah banne ke liye.', delay: 3200 },
+        { text: 'Thank you mujhe kabhi udaas na dekh paane ke liye.', delay: 6500 }
+      ],
+      duration: 9500
+    },
+    // Scene 7 - Trust
+    {
+      mode: 'HEART_FORM',
+      bgGlow: 0.4,
+      lines: [
+        { text: 'Thank you...', delay: 0 },
+        { text: 'Meri zindagi mein aakhri bharosa banne ke liye. ❤️', highlight: true, delay: 1800 },
+        { text: 'Mujh par itna bharosa karne ke liye...', delay: 4500 }
+      ],
+      duration: 7200
+    },
+    // Scene 8 - Unspoken Feelings
+    {
+      mode: 'HEART_FORM',
+      bgGlow: 0.3,
+      lines: [
+        { text: 'Aur thank you us har ek cheez ke liye...', delay: 0 },
+        { text: 'Jo tumne mere liye ki hai.', delay: 2200 },
+        { text: 'Shayad main har baar words mein nahi bata pata...', delay: 4500 },
+        { text: 'Lekin main har cheez dil se feel karta hoon. ❤️', highlight: true, delay: 7200 }
+      ],
+      duration: 10000
+    },
+    // Scene 9 - Promise Intro
+    {
+      mode: 'WARM_BURST',
+      bgGlow: 0.5,
+      lines: [
+        { text: 'Aur ab... meri taraf se ek vaada. ❤️', highlight: true, delay: 0 },
+        { text: 'Main tumhare saath hamesha rehne ki poori koshish karunga...', delay: 2800 },
+        { text: 'Chahe koi saath de... Ya na de.', delay: 5800 },
+        { text: 'Main tumhara saath nahi chhodunga.', delay: 8200 }
+      ],
+      duration: 11000
+    },
+    // Scene 10 - Queen Promise & Realism
+    {
+      mode: 'WARM_BURST',
+      bgGlow: 0.45,
+      lines: [
+        { text: 'Vaada hai...', delay: 0 },
+        { text: 'Main poori koshish karunga ki tumhe Rani bana kar rakhun. 👑❤️', highlight: true, delay: 1800 },
+        { text: 'Confirmation isliye nahi...', delay: 4800 },
+        { text: 'Kyuki future kisi ne nahi dekha.', delay: 7000 },
+        { text: 'Lekin vaada zaroor hai...', delay: 9200 }
+      ],
+      duration: 11500
+    },
+    // Scene 11 - Final Promise
+    {
+      mode: 'WARM_BURST',
+      bgGlow: 0.4,
+      lines: [
+        { text: 'Tumhari khushi ke liye...', delay: 0 },
+        { text: 'Tumhari wishes ke liye...', delay: 2200 },
+        { text: 'Jitna mere bas mein hoga...', delay: 4400 },
+        { text: 'Main har mumkin koshish karunga. ❤️', highlight: true, delay: 6600 }
+      ],
+      duration: 9500
+    },
+    // Scene 12 - Grand Finale
+    {
+      mode: 'WARM_BURST',
+      bgGlow: 0.6,
+      lines: [
+        { text: 'Jaan...', delay: 0 },
+        { text: 'Thank You Soo Much. ❤️', highlight: true, delay: 1800 },
+        { text: 'For everything.', delay: 4200 },
+        { text: 'I’m really grateful that you are in my life. 🫶', delay: 6200 },
+        { text: 'Thank You Soo Much, Jaan. ❤️', highlight: true, delay: 9000 },
+        { text: 'Hamesha khush rehna...', delay: 11800 },
+        { text: 'Aur bas aise hi mera saath dena. 🌸', delay: 14000 }
+      ],
+      duration: 17500
+    }
+  ];
+
+  let currentTimeoutIds = [];
+
+  function clearScriptTimeouts() {
+    currentTimeoutIds.forEach(id => clearTimeout(id));
+    currentTimeoutIds = [];
+  }
+
+  function playSequence() {
+    textOverlay.innerHTML = '';
+    replayScreen.classList.add('hidden');
+    clearScriptTimeouts();
+
+    let cumulativeTime = 0;
+
+    script.forEach((scene) => {
+      // Schedule Scene Start
+      const sceneStartId = setTimeout(() => {
+        currentVisualMode = scene.mode;
+        glowOverlay.style.opacity = scene.bgGlow;
+        textOverlay.innerHTML = ''; // Clear previous lines
+
+        // Render Scene Sub-lines
+        scene.lines.forEach((lineObj) => {
+          const lineTimeoutId = setTimeout(() => {
+            const el = document.createElement('div');
+            el.className = 'msg-line' + (lineObj.highlight ? ' highlight' : '');
+            el.innerText = lineObj.text;
+            textOverlay.appendChild(el);
+
+            // Trigger Animation
+            requestAnimationFrame(() => {
+              el.classList.add('visible');
+            });
+          }, lineObj.delay);
+
+          currentTimeoutIds.push(lineTimeoutId);
+        });
+
+      }, cumulativeTime);
+
+      currentTimeoutIds.push(sceneStartId);
+
+      // Schedule Scene Exit (Fade Out Lines)
+      const sceneExitId = setTimeout(() => {
+        const activeLines = textOverlay.querySelectorAll('.msg-line');
+        activeLines.forEach(line => {
+          line.classList.remove('visible');
+          line.classList.add('exit');
+        });
+      }, cumulativeTime + scene.duration - 800);
+
+      currentTimeoutIds.push(sceneExitId);
+
+      cumulativeTime += scene.duration;
+    });
+
+    // End of Sequence -> Show Replay
+    const endId = setTimeout(() => {
+      replayScreen.classList.remove('hidden');
+    }, cumulativeTime);
+
+    currentTimeoutIds.push(endId);
+  }
+
+  // Automatic Start Strategy
+  function startAutomatically() {
+    initParticles();
+    render();
+    playSequence();
+    
+    // Attempt audio playback on load and on first user interaction if blocked by browser policy
+    initAudio();
+    const enableAudio = () => {
+      if (audioCtx) {
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+      } else {
+        initAudio();
+      }
+      window.removeEventListener('click', enableAudio);
+      window.removeEventListener('touchstart', enableAudio);
+    };
+    window.addEventListener('click', enableAudio);
+    window.addEventListener('touchstart', enableAudio);
+  }
+
+  window.addEventListener('DOMContentLoaded', startAutomatically);
+
+  replayBtn.addEventListener('click', () => {
+    playSequence();
+  });
+</script>
+</body>
+</html>
+
